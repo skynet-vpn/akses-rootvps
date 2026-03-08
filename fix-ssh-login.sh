@@ -1,30 +1,35 @@
-cat << 'EOF' > fix-ssh-login.sh
+cat << 'EOF' > auto-fix-ssh.sh
 #!/bin/bash
+
+# Jika bukan root, otomatis sudo
+if [ "$EUID" -ne 0 ]; then
+  echo "Switch ke root..."
+  sudo -i "$0"
+  exit
+fi
 
 echo "Memperbaiki konfigurasi SSH..."
 
-# Minta password root baru
-echo "Masukkan password root baru:"
+echo "Set password root:"
 passwd root
 
-# Backup config
+echo "Backup konfigurasi SSH..."
 cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 
-# Edit sshd_config utama
+echo "Mengatur sshd_config..."
 sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 sed -i 's/^#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
 
-# Perbaiki config override Ubuntu cloud
+echo "Memperbaiki config cloud-init..."
 if [ -f /etc/ssh/sshd_config.d/60-cloudimg-settings.conf ]; then
     sed -i 's/^PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
     sed -i 's/^PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
 fi
 
-# Restart SSH
+echo "Restart SSH..."
 systemctl restart ssh
 
-echo "Selesai."
-echo "Cek konfigurasi:"
+echo "Selesai. Status konfigurasi:"
 sshd -T | egrep 'permitrootlogin|passwordauthentication'
 EOF
